@@ -1,8 +1,8 @@
 {
   "name": "markdown-concat-viewer-vs-code",
   "displayName": "markdown-concat-viewer-vs-code",
-  "description": "",
-  "version": "0.0.1",
+  "description": "Read multiple Markdown files as one. Minimize cognitive load by eliminating tab-switching.",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.108.1"
   },
