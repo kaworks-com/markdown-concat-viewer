@@ -18,7 +18,7 @@
 - TOC クリックで対象見出しへスムーズスクロール（必要時は該当ファイルを自動展開）
 - Markdown 内の生 HTML を無効化（`markdown-it` の `html: false`）
 
-<img src="https://github.com/kaworks-com/markdown-concat-viewer/blob/dev/sample.png">
+<img src="https://kaworks.com/products/markdown-concat-viewer/sample.png">
 
 ## 使い方
 
