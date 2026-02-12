@@ -3,11 +3,20 @@
   "displayName": "markdown-concat-viewer-vs-code",
   "description": "Read multiple Markdown files as one. Minimize cognitive load by eliminating tab-switching.",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ayutaya/markdown-concat-viewer.git"
+  },
   "engines": {
     "vscode": "^1.108.1"
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "context",
+    "working memory"
   ],
   "icon": "icon.png",
   "activationEvents": [],
