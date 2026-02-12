@@ -1,0 +1,42 @@
+name: Build VSIX and Create Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Package VSIX
+        id: package
+        run: |
+          VSIX_NAME=$(node -p "const p=require('./package.json'); `${p.name}-${p.version}.vsix`")
+          npx @vscode/vsce package --out "$VSIX_NAME"
+          echo "vsix_path=$VSIX_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.package.outputs.vsix_path }}
+          generate_release_notes: true
