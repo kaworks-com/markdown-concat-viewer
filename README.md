@@ -59,3 +59,9 @@
 ## サードパーティライセンス
 
 サードパーティライブラリのライセンス情報は `THIRD_PARTY_NOTICES.md` を参照してください。
+
+## リリース
+
+[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Kaworks.markdown-concat-viewer-vs-code)
+
+[OpenVSX](https://open-vsx.org/extension/kaworks/markdown-concat-viewer-vs-code)
