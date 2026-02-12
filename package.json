@@ -6,7 +6,7 @@
   "version": "0.1.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ayutaya/markdown-concat-viewer.git"
+    "url": "https://github.com/kaworks-com/markdown-concat-viewer.git"
   },
   "engines": {
     "vscode": "^1.108.1"
