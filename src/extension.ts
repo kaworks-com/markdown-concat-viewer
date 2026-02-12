@@ -36,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 				const panel = vscode.window.createWebviewPanel(
 					"markdownConcatViewerView",
-					"Combined Markdown View",
+					"Markdown Concat View",
 					vscode.ViewColumn.Active,
 					{
 						enableScripts: true,
@@ -251,7 +251,7 @@ function buildWebviewHtml(
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Combined Markdown View</title>
+<title>Concat Markdown View</title>
 <style>
   :root {
     --border: rgba(127,127,127,0.25);

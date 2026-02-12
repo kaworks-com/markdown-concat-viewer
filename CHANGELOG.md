@@ -6,10 +6,18 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-13
+
+### Changed
+- Webview パネル名を「Combined Markdown View」から「Markdown Concat View」へ統一
+- Webview の HTML タイトルを「Combined Markdown View」から「Concat Markdown View」へ変更
+- 対応 VS Code バージョン要件を `^1.107.0` に調整（antigravity動作バージョンに対応）
+- README にサンプル画像を追加
+
 ## [0.0.1] - 2026-02-13
 ### Features
 - 複数の Markdown ファイルを連結してプレビューする機能を追加
-- エクスプローラーのコンテキストメニューから「Combined Markdown View」を開く機能
+- エクスプローラーのコンテキストメニューから「Markdown Concat View」を開く機能
 - ディレクトリ選択時に直下の Markdown ファイルを一括表示する機能
 - サイドバーへの目次 (TOC) 表示とページ内ナビゲーション機能
 - 各ファイルごとの折りたたみ表示 (Details/Summary)

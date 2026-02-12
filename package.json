@@ -3,13 +3,13 @@
   "displayName": "markdown-concat-viewer-vs-code",
   "description": "Read multiple Markdown files as one. Minimize cognitive load by eliminating tab-switching.",
   "publisher": "Kaworks",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/kaworks-com/markdown-concat-viewer.git"
   },
   "engines": {
-    "vscode": "^1.108.1"
+    "vscode": "^1.107.0"
   },
   "categories": [
     "Other"
