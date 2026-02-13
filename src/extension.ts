@@ -6,11 +6,18 @@ import markdownit from 'markdown-it';
 
 type TocItem = {
 	fileIndex: number;
-	filePath: string;
 	fileName: string;
+	fileUriKey: string;
 	level: number; // 1..6
 	text: string;
 	anchorId: string;
+	sourceLine: number;
+};
+
+type TocFile = {
+	fileIndex: number;
+	fileName: string;
+	fileUriKey: string;
 };
 
 export function activate(context: vscode.ExtensionContext) {
@@ -44,41 +51,50 @@ export function activate(context: vscode.ExtensionContext) {
 					}
 				);
 
-				const md = createMarkdownIt();
-				const toc: TocItem[] = [];
+				const markdownPathSet = new Set(mdUris.map((u) => toPathKey(u.fsPath)));
+				const markdownUriMap = new Map(mdUris.map((u) => [toUriKey(u), u]));
+				const renderView = async () => {
+					panel.webview.html = await buildPanelHtml(panel.webview, mdUris);
+				};
 
-				const sectionsHtml: string[] = [];
-				for (let i = 0; i < mdUris.length; i++) {
-					const u = mdUris[i];
-					const buf = await vscode.workspace.fs.readFile(u);
-					const text = new TextDecoder().decode(buf);
-					const displayPath = toProjectRelativePath(u);
-
-					const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
-						fileIndex: i,
-						filePath: displayPath,
-						fileName: path.basename(u.fsPath)
-					});
-
-					toc.push(...tocItemsForFile);
-
-					sectionsHtml.push(`
-  <details class="file-section" data-file-index="${i}" open>
-    <summary class="file-summary">
-      <div class="file-title">${escapeHtml(path.basename(u.fsPath))}</div>
-      <div class="file-path">${escapeHtml(displayPath)}</div>
-    </summary>
-    <div class="file-body markdown-body">
-      ${html}
-    </div>
-  </details>
-`);
-				}
-
-				panel.webview.html = buildWebviewHtml(panel.webview, {
-					toc,
-					contentHtml: sectionsHtml.join("\n")
+				panel.webview.onDidReceiveMessage(async (message) => {
+					if (!message || message.type !== "openMarkdownForEditAtLine" || typeof message.fileUriKey !== "string") {
+						return;
+					}
+					const targetUri = markdownUriMap.get(message.fileUriKey);
+					if (!targetUri) {
+						return;
+					}
+					const line = typeof message.line === "number" && Number.isInteger(message.line) && message.line > 0
+						? message.line
+						: 1;
+					try {
+						const doc = await vscode.workspace.openTextDocument(targetUri);
+						const targetLine = Math.min(Math.max(line - 1, 0), Math.max(doc.lineCount - 1, 0));
+						const selection = new vscode.Range(targetLine, 0, targetLine, 0);
+						await vscode.window.showTextDocument(doc, {
+							// 同じグループ内で開く（ユーザーが分割していればそちらで、していなければ同一タブで上書き）
+							// viewColumn: vscode.ViewColumn.Beside,
+							preview: false,
+							selection
+						});
+					} catch {
+						vscode.window.showErrorMessage("Markdownファイルを編集タブで開けませんでした。");
+					}
 				});
+
+				const saveListener = vscode.workspace.onDidSaveTextDocument(async (doc) => {
+					if (!markdownPathSet.has(toPathKey(doc.uri.fsPath))) {
+						return;
+					}
+					await renderView();
+				});
+
+				panel.onDidDispose(() => {
+					saveListener.dispose();
+				});
+
+				await renderView();
 			}
 		)
 	);
@@ -185,7 +201,7 @@ function createMarkdownIt(): markdownit {
 function renderMarkdownWithAnchors(
 	md: markdownit,
 	markdownText: string,
-	file: { fileIndex: number; filePath: string; fileName: string }
+	file: { fileIndex: number; fileName: string; fileUriKey: string }
 ): { html: string; tocItemsForFile: TocItem[] } {
 	const tocItems: TocItem[] = [];
 	let headingSeq = 0;
@@ -206,14 +222,18 @@ function renderMarkdownWithAnchors(
 
 		const anchorId = `cmv-${file.fileIndex}-${headingSeq++}-${slugify(text) || "heading"}`;
 		token.attrSet("id", anchorId);
+		const sourceLine = Array.isArray(token.map) && typeof token.map[0] === "number"
+			? token.map[0] + 1
+			: 1;
 
 		tocItems.push({
 			fileIndex: file.fileIndex,
-			filePath: file.filePath,
 			fileName: file.fileName,
+			fileUriKey: file.fileUriKey,
 			level,
 			text,
-			anchorId
+			anchorId,
+			sourceLine
 		});
 
 		return originalHeadingOpen(tokens, idx, options, env, self);
@@ -230,12 +250,12 @@ function renderMarkdownWithAnchors(
 
 function buildWebviewHtml(
 	webview: vscode.Webview,
-	payload: { toc: TocItem[]; contentHtml: string }
+	payload: { files: TocFile[]; toc: TocItem[]; contentHtml: string }
 ): string {
 	const nonce = getNonce();
 
 	// TOCはHTMLを自前生成（安全のため text は escape）
-	const tocHtml = buildTocHtml(payload.toc);
+	const tocHtml = buildTocHtml(payload.files, payload.toc);
 
 	// 最低限のCSP。styleは埋め込み、scriptはnonceで許可。
 	const csp = [
@@ -275,10 +295,19 @@ function buildWebviewHtml(
   .toc .group-title {
     font-size: 1rem;
     color: var(--muted);
-    margin: 14px 6px 6px;
+    margin: 14px 0 6px;
     word-break: break-all;
   }
-  .toc a {
+  .toc .group-row {
+    padding: 0 6px;
+  }
+  .toc .toc-item-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+  }
+  .toc .toc-item-row .toc-link {
     display: block;
     text-decoration: none;
     padding: 4px 6px;
@@ -288,15 +317,39 @@ function buildWebviewHtml(
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .toc a:hover {
+  .toc .toc-item-row .toc-link:hover {
     background: rgba(127,127,127,0.15);
   }
-  .toc .lvl-1 { padding-left: 6px; font-weight: 600; }
-  .toc .lvl-2 { padding-left: 18px; }
-  .toc .lvl-3 { padding-left: 30px; }
-  .toc .lvl-4 { padding-left: 42px; }
-  .toc .lvl-5 { padding-left: 54px; }
-  .toc .lvl-6 { padding-left: 66px; }
+  .toc .toc-edit-button {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease-out;
+  }
+  .toc .toc-item-row:hover .toc-edit-button,
+  .toc .toc-item-row:focus-within .toc-edit-button {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .toc .toc-edit-button:hover {
+    background: rgba(127,127,127,0.2);
+  }
+  .toc .toc-item-row.lvl-1 { padding-left: 6px; }
+  .toc .toc-item-row.lvl-2 { padding-left: 18px; }
+  .toc .toc-item-row.lvl-3 { padding-left: 30px; }
+  .toc .toc-item-row.lvl-4 { padding-left: 42px; }
+  .toc .toc-item-row.lvl-5 { padding-left: 54px; }
+  .toc .toc-item-row.lvl-6 { padding-left: 66px; }
+  .toc .toc-item-row.lvl-1 .toc-link { font-weight: 600; }
 
   .content {
     overflow: auto;
@@ -378,6 +431,24 @@ function buildWebviewHtml(
 </div>
 
 <script nonce="${nonce}">
+  const vscodeApi = acquireVsCodeApi();
+
+  document.querySelectorAll('.toc .toc-edit-button[data-file-uri-key][data-line]').forEach(button => {
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const fileUriKey = button.getAttribute('data-file-uri-key');
+      const lineText = button.getAttribute('data-line');
+      const line = lineText ? Number.parseInt(lineText, 10) : NaN;
+      if (!fileUriKey || !Number.isInteger(line) || line <= 0) return;
+      vscodeApi.postMessage({
+        type: 'openMarkdownForEditAtLine',
+        fileUriKey,
+        line
+      });
+    });
+  });
+
   // TOCクリックで該当idへスクロール（本文ペイン内）
   document.querySelectorAll('.toc a[data-anchor]').forEach(a => {
     a.addEventListener('click', (e) => {
@@ -421,8 +492,58 @@ function buildWebviewHtml(
 </html>`;
 }
 
-function buildTocHtml(items: TocItem[]): string {
-	// ファイルごとにグルーピング
+async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Promise<string> {
+	const md = createMarkdownIt();
+	const toc: TocItem[] = [];
+	const files: TocFile[] = [];
+	const sectionsHtml: string[] = [];
+
+	for (let i = 0; i < mdUris.length; i++) {
+		const u = mdUris[i];
+		const buf = await vscode.workspace.fs.readFile(u);
+		const text = new TextDecoder().decode(buf);
+		const displayPath = toProjectRelativePath(u);
+		const fileName = path.basename(u.fsPath);
+
+		const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
+			fileIndex: i,
+			fileName,
+			fileUriKey: toUriKey(u)
+		});
+
+		toc.push(...tocItemsForFile);
+		files.push({
+			fileIndex: i,
+			fileName,
+			fileUriKey: toUriKey(u)
+		});
+
+		sectionsHtml.push(`
+  <details class="file-section" data-file-index="${i}" open>
+    <summary class="file-summary">
+      <div class="file-title">${escapeHtml(fileName)}</div>
+      <div class="file-path">${escapeHtml(displayPath)}</div>
+    </summary>
+    <div class="file-body markdown-body">
+      ${html}
+    </div>
+  </details>
+`);
+	}
+
+	return buildWebviewHtml(webview, {
+		files,
+		toc,
+		contentHtml: sectionsHtml.join("\n")
+	});
+}
+
+function buildTocHtml(files: TocFile[], items: TocItem[]): string {
+	const fileMap = new Map<number, TocFile>();
+	for (const file of files) {
+		fileMap.set(file.fileIndex, file);
+	}
+
 	const byFile = new Map<number, TocItem[]>();
 	for (const it of items) {
 		const arr = byFile.get(it.fileIndex) ?? [];
@@ -431,14 +552,29 @@ function buildTocHtml(items: TocItem[]): string {
 	}
 
 	let html = "";
-	for (const [fileIndex, arr] of [...byFile.entries()].sort((a, b) => a[0] - b[0])) {
-		const fileName = arr[0]?.fileName ?? `file-${fileIndex}`;
-		html += `<div class="group-title">${escapeHtml(fileName)}</div>`;
+	for (const file of files) {
+		const arr = byFile.get(file.fileIndex) ?? [];
+		const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
+		html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
 		for (const it of arr) {
-			html += `<a href="#" class="lvl-${it.level}" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>`;
+				html += `<div class="toc-item-row lvl-${it.level}">
+  <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>
+  <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-uri-key="${escapeHtml(it.fileUriKey)}" data-line="${it.sourceLine}">✎</button>
+</div>`;
+			}
 		}
-	}
 	return html;
+}
+
+function toUriKey(uri: vscode.Uri): string {
+	return uri.toString();
+}
+
+function toPathKey(fsPath: string): string {
+	if (process.platform === "win32") {
+		return fsPath.toLowerCase();
+	}
+	return fsPath;
 }
 
 function slugify(s: string): string {
