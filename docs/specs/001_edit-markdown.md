@@ -13,13 +13,13 @@ Markdown Concat Viewer の TOC に、表示中の各 Markdown ファイルを編
 - 非対象: フォルダ探索仕様（直下のみ）、Markdown レンダリング仕様（`html: false`）、TOC のスクロール仕様。
 
 ## ユースケース
-1. ユーザーが TOC のファイル見出し行にマウスオーバーする。
+1. ユーザーが TOC グループ行にマウスオーバーする。
 2. 行の右端に `edit` アイコンボタンが表示される。
 3. クリックすると、対応する Markdown ファイルが VS Code のエディタ領域に新規タブとして開く。
 4. 編集して保存すると、開いている Concat View が自動的に再描画される。
 
 ## 機能要件
-- TOC のファイル単位見出し（現行 `group-title` 相当）ごとに、編集ボタンを配置する。
+- TOC グループ行（`group-row`）ごとに、TOC 編集ボタン（`toc-edit-button`）を配置する。
 - 編集ボタンはマウスオーバー時のみ表示する。
 - キーボード操作時の到達性を確保するため、フォーカス時にも表示できること（`focus-within` を許容）。
 - 編集ボタン押下時、該当ファイルを `vscode.open` 相当で開く。
@@ -29,7 +29,7 @@ Markdown Concat Viewer の TOC に、表示中の各 Markdown ファイルを編
 - 失敗時は日本語メッセージを表示する。
 
 ## UI仕様
-- 追加位置: TOC の各ファイル見出し行の右端。
+- 追加位置: TOC グループ行（`group-row`）の右端。
 - 表示制御:
   - 通常時: 非表示（`opacity: 0` かつ `pointer-events: none`）
   - ホバー/フォーカス時: 表示（`opacity: 1`）
@@ -38,7 +38,7 @@ Markdown Concat Viewer の TOC に、表示中の各 Markdown ファイルを編
 
 ## 実装方針
 ### 1. TOCデータ拡張
-- `buildTocHtml` でファイル見出し行に、編集ボタン用 `data-file-path` を埋め込む。
+- `buildTocHtml` で TOC グループ行（`group-row`）に、編集ボタン用 `data-file-path` を埋め込む。
 - `renderMarkdownWithAnchors` で保持している `filePath`（表示用相対パス）とは別に、実ファイルパス（`fsPath`）を TOC 生成に渡せる構造へ拡張する。
 
 ### 2. Webviewイベント処理
@@ -81,7 +81,7 @@ Markdown Concat Viewer の TOC に、表示中の各 Markdown ファイルを編
 - 保存のたびに再描画が走るため、大量ファイル構成では体感遅延が増える可能性。
 
 ## 代替案
-- 代替案A: ファイル見出し行全体を右クリックで「編集で開く」
+- 代替案A: TOC グループ行全体を右クリックで「編集で開く」
   - 利点: DOM追加が少ない
   - 欠点: discoverability が低い
 - 代替案B: TOC右上に「現在ファイルを編集」固定ボタン
@@ -96,7 +96,7 @@ Markdown Concat Viewer の TOC に、表示中の各 Markdown ファイルを編
 - `yarn run lint`
 - `yarn run test`
 - 手動確認
-  - TOC見出し行ホバーで編集ボタンが出る
+  - TOC グループ行ホバーで編集ボタンが出る
   - ボタンクリックで対象Markdownが新規タブで開く
   - 対象Markdown保存時に Concat View が自動リロードされる
   - 対象外ファイル保存ではリロードされない
