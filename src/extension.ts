@@ -7,9 +7,11 @@ import markdownit from 'markdown-it';
 type TocItem = {
 	fileIndex: number;
 	fileName: string;
+	fileFsPath: string;
 	level: number; // 1..6
 	text: string;
 	anchorId: string;
+	sourceLine: number;
 };
 
 type TocFile = {
@@ -55,14 +57,24 @@ export function activate(context: vscode.ExtensionContext) {
 				};
 
 				panel.webview.onDidReceiveMessage(async (message) => {
-					if (!message || message.type !== "openMarkdownForEdit" || typeof message.filePath !== "string") {
+					if (!message || message.type !== "openMarkdownForEditAtLine" || typeof message.filePath !== "string") {
 						return;
 					}
 					if (!markdownPathSet.has(toPathKey(message.filePath))) {
 						return;
 					}
+					const line = typeof message.line === "number" && Number.isInteger(message.line) && message.line > 0
+						? message.line
+						: 1;
 					try {
-						await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(message.filePath));
+						const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath));
+						const targetLine = Math.min(Math.max(line - 1, 0), Math.max(doc.lineCount - 1, 0));
+						const selection = new vscode.Range(targetLine, 0, targetLine, 0);
+						await vscode.window.showTextDocument(doc, {
+							// viewColumn: vscode.ViewColumn.Beside,
+							preview: false,
+							selection
+						});
 					} catch {
 						vscode.window.showErrorMessage("Markdownファイルを編集タブで開けませんでした。");
 					}
@@ -186,7 +198,7 @@ function createMarkdownIt(): markdownit {
 function renderMarkdownWithAnchors(
 	md: markdownit,
 	markdownText: string,
-	file: { fileIndex: number; fileName: string }
+	file: { fileIndex: number; fileName: string; fileFsPath: string }
 ): { html: string; tocItemsForFile: TocItem[] } {
 	const tocItems: TocItem[] = [];
 	let headingSeq = 0;
@@ -207,13 +219,18 @@ function renderMarkdownWithAnchors(
 
 		const anchorId = `cmv-${file.fileIndex}-${headingSeq++}-${slugify(text) || "heading"}`;
 		token.attrSet("id", anchorId);
+		const sourceLine = Array.isArray(token.map) && typeof token.map[0] === "number"
+			? token.map[0] + 1
+			: 1;
 
 		tocItems.push({
 			fileIndex: file.fileIndex,
 			fileName: file.fileName,
+			fileFsPath: file.fileFsPath,
 			level,
 			text,
-			anchorId
+			anchorId,
+			sourceLine
 		});
 
 		return originalHeadingOpen(tokens, idx, options, env, self);
@@ -279,11 +296,26 @@ function buildWebviewHtml(
     word-break: break-all;
   }
   .toc .group-row {
+    padding: 0 6px;
+  }
+  .toc .toc-item-row {
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
     gap: 8px;
-    padding: 0 6px;
+  }
+  .toc .toc-item-row .toc-link {
+    display: block;
+    text-decoration: none;
+    padding: 4px 6px;
+    border-radius: 6px;
+    color: inherit;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc .toc-item-row .toc-link:hover {
+    background: rgba(127,127,127,0.15);
   }
   .toc .toc-edit-button {
     width: 24px;
@@ -300,33 +332,21 @@ function buildWebviewHtml(
     pointer-events: none;
     transition: opacity 0.12s ease-out;
   }
-  .toc .group-row:hover .toc-edit-button,
-  .toc .group-row:focus-within .toc-edit-button {
+  .toc .toc-item-row:hover .toc-edit-button,
+  .toc .toc-item-row:focus-within .toc-edit-button {
     opacity: 1;
     pointer-events: auto;
   }
   .toc .toc-edit-button:hover {
     background: rgba(127,127,127,0.2);
   }
-  .toc a {
-    display: block;
-    text-decoration: none;
-    padding: 4px 6px;
-    border-radius: 6px;
-    color: inherit;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .toc a:hover {
-    background: rgba(127,127,127,0.15);
-  }
-  .toc .lvl-1 { padding-left: 6px; font-weight: 600; }
-  .toc .lvl-2 { padding-left: 18px; }
-  .toc .lvl-3 { padding-left: 30px; }
-  .toc .lvl-4 { padding-left: 42px; }
-  .toc .lvl-5 { padding-left: 54px; }
-  .toc .lvl-6 { padding-left: 66px; }
+  .toc .toc-item-row.lvl-1 { padding-left: 6px; }
+  .toc .toc-item-row.lvl-2 { padding-left: 18px; }
+  .toc .toc-item-row.lvl-3 { padding-left: 30px; }
+  .toc .toc-item-row.lvl-4 { padding-left: 42px; }
+  .toc .toc-item-row.lvl-5 { padding-left: 54px; }
+  .toc .toc-item-row.lvl-6 { padding-left: 66px; }
+  .toc .toc-item-row.lvl-1 .toc-link { font-weight: 600; }
 
   .content {
     overflow: auto;
@@ -410,15 +430,18 @@ function buildWebviewHtml(
 <script nonce="${nonce}">
   const vscodeApi = acquireVsCodeApi();
 
-  document.querySelectorAll('.toc .toc-edit-button[data-file-path]').forEach(button => {
+  document.querySelectorAll('.toc .toc-edit-button[data-file-path][data-line]').forEach(button => {
     button.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       const filePath = button.getAttribute('data-file-path');
-      if (!filePath) return;
+      const lineText = button.getAttribute('data-line');
+      const line = lineText ? Number.parseInt(lineText, 10) : NaN;
+      if (!filePath || !Number.isInteger(line) || line <= 0) return;
       vscodeApi.postMessage({
-        type: 'openMarkdownForEdit',
-        filePath
+        type: 'openMarkdownForEditAtLine',
+        filePath,
+        line
       });
     });
   });
@@ -481,7 +504,8 @@ async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Pr
 
 		const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
 			fileIndex: i,
-			fileName
+			fileName,
+			fileFsPath: u.fsPath
 		});
 
 		toc.push(...tocItemsForFile);
@@ -528,12 +552,12 @@ function buildTocHtml(files: TocFile[], items: TocItem[]): string {
 	for (const file of files) {
 		const arr = byFile.get(file.fileIndex) ?? [];
 		const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
-		html += `<div class="group-row">
-  <div class="group-title">${escapeHtml(fileName)}</div>
-  <button class="toc-edit-button" type="button" title="このMarkdownを編集で開く" aria-label="このMarkdownを編集で開く" data-file-path="${escapeHtml(file.fileFsPath)}">✎</button>
-</div>`;
+		html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
 		for (const it of arr) {
-			html += `<a href="#" class="lvl-${it.level}" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>`;
+			html += `<div class="toc-item-row lvl-${it.level}">
+  <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>
+  <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-path="${escapeHtml(it.fileFsPath)}" data-line="${it.sourceLine}">✎</button>
+</div>`;
 		}
 	}
 	return html;

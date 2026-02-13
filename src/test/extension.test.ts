@@ -70,17 +70,20 @@ suite('Extension Test Suite', () => {
 		const md = __test__.createMarkdownIt();
 		const first = __test__.renderMarkdownWithAnchors(md, '# First', {
 			fileIndex: 0,
-			fileName: 'a.md'
+			fileName: 'a.md',
+			fileFsPath: '/tmp/a.md'
 		});
 		const second = __test__.renderMarkdownWithAnchors(md, '# Second', {
 			fileIndex: 1,
-			fileName: 'b.md'
+			fileName: 'b.md',
+			fileFsPath: '/tmp/b.md'
 		});
 
 		assert.ok(first.html.includes('id="cmv-0-0-first"'));
 		assert.ok(second.html.includes('id="cmv-1-0-second"'));
 		assert.strictEqual(first.tocItemsForFile[0]?.anchorId, 'cmv-0-0-first');
 		assert.strictEqual(second.tocItemsForFile[0]?.anchorId, 'cmv-1-0-second');
+		assert.strictEqual(first.tocItemsForFile[0]?.sourceLine, 1);
 	});
 
 	test('buildWebviewHtml には TOC 遷移時の展開とオフセット制御が含まれる', () => {
@@ -95,9 +98,11 @@ suite('Extension Test Suite', () => {
 				toc: [{
 					fileIndex: 0,
 					fileName: 'a.md',
+					fileFsPath: '/tmp/a.md',
 					level: 1,
 					text: 'H1',
-					anchorId: 'cmv-0-0-h1'
+					anchorId: 'cmv-0-0-h1',
+					sourceLine: 1
 				}],
 				contentHtml: '<details class="file-section"><summary class="file-summary">a.md</summary><h1 id="cmv-0-0-h1">H1</h1></details>'
 			}
@@ -108,7 +113,7 @@ suite('Extension Test Suite', () => {
 		assert.ok(html.includes('offsetTop = summaryHeight + 8'));
 	});
 
-	test('buildTocHtml はファイル行に編集ボタンを含める', () => {
+	test('buildTocHtml は見出し行に編集ボタンと行番号を含める', () => {
 		const html = __test__.buildTocHtml(
 			[{
 				fileIndex: 0,
@@ -118,13 +123,16 @@ suite('Extension Test Suite', () => {
 			[{
 				fileIndex: 0,
 				fileName: 'a.md',
+				fileFsPath: '/tmp/a.md',
 				level: 1,
 				text: 'H1',
-				anchorId: 'cmv-0-0-h1'
+				anchorId: 'cmv-0-0-h1',
+				sourceLine: 12
 			}]
 		);
 
 		assert.ok(html.includes('class="toc-edit-button"'));
 		assert.ok(html.includes('data-file-path="/tmp/a.md"'));
+		assert.ok(html.includes('data-line="12"'));
 	});
 });
