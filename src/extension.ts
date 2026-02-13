@@ -7,7 +7,7 @@ import markdownit from 'markdown-it';
 type TocItem = {
 	fileIndex: number;
 	fileName: string;
-	fileFsPath: string;
+	fileUriKey: string;
 	level: number; // 1..6
 	text: string;
 	anchorId: string;
@@ -17,7 +17,7 @@ type TocItem = {
 type TocFile = {
 	fileIndex: number;
 	fileName: string;
-	fileFsPath: string;
+	fileUriKey: string;
 };
 
 export function activate(context: vscode.ExtensionContext) {
@@ -52,25 +52,28 @@ export function activate(context: vscode.ExtensionContext) {
 				);
 
 				const markdownPathSet = new Set(mdUris.map((u) => toPathKey(u.fsPath)));
+				const markdownUriMap = new Map(mdUris.map((u) => [toUriKey(u), u]));
 				const renderView = async () => {
 					panel.webview.html = await buildPanelHtml(panel.webview, mdUris);
 				};
 
 				panel.webview.onDidReceiveMessage(async (message) => {
-					if (!message || message.type !== "openMarkdownForEditAtLine" || typeof message.filePath !== "string") {
+					if (!message || message.type !== "openMarkdownForEditAtLine" || typeof message.fileUriKey !== "string") {
 						return;
 					}
-					if (!markdownPathSet.has(toPathKey(message.filePath))) {
+					const targetUri = markdownUriMap.get(message.fileUriKey);
+					if (!targetUri) {
 						return;
 					}
 					const line = typeof message.line === "number" && Number.isInteger(message.line) && message.line > 0
 						? message.line
 						: 1;
 					try {
-						const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(message.filePath));
+						const doc = await vscode.workspace.openTextDocument(targetUri);
 						const targetLine = Math.min(Math.max(line - 1, 0), Math.max(doc.lineCount - 1, 0));
 						const selection = new vscode.Range(targetLine, 0, targetLine, 0);
 						await vscode.window.showTextDocument(doc, {
+							// 同じグループ内で開く（ユーザーが分割していればそちらで、していなければ同一タブで上書き）
 							// viewColumn: vscode.ViewColumn.Beside,
 							preview: false,
 							selection
@@ -198,7 +201,7 @@ function createMarkdownIt(): markdownit {
 function renderMarkdownWithAnchors(
 	md: markdownit,
 	markdownText: string,
-	file: { fileIndex: number; fileName: string; fileFsPath: string }
+	file: { fileIndex: number; fileName: string; fileUriKey: string }
 ): { html: string; tocItemsForFile: TocItem[] } {
 	const tocItems: TocItem[] = [];
 	let headingSeq = 0;
@@ -226,7 +229,7 @@ function renderMarkdownWithAnchors(
 		tocItems.push({
 			fileIndex: file.fileIndex,
 			fileName: file.fileName,
-			fileFsPath: file.fileFsPath,
+			fileUriKey: file.fileUriKey,
 			level,
 			text,
 			anchorId,
@@ -430,17 +433,17 @@ function buildWebviewHtml(
 <script nonce="${nonce}">
   const vscodeApi = acquireVsCodeApi();
 
-  document.querySelectorAll('.toc .toc-edit-button[data-file-path][data-line]').forEach(button => {
+  document.querySelectorAll('.toc .toc-edit-button[data-file-uri-key][data-line]').forEach(button => {
     button.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const filePath = button.getAttribute('data-file-path');
+      const fileUriKey = button.getAttribute('data-file-uri-key');
       const lineText = button.getAttribute('data-line');
       const line = lineText ? Number.parseInt(lineText, 10) : NaN;
-      if (!filePath || !Number.isInteger(line) || line <= 0) return;
+      if (!fileUriKey || !Number.isInteger(line) || line <= 0) return;
       vscodeApi.postMessage({
         type: 'openMarkdownForEditAtLine',
-        filePath,
+        fileUriKey,
         line
       });
     });
@@ -505,14 +508,14 @@ async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Pr
 		const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
 			fileIndex: i,
 			fileName,
-			fileFsPath: u.fsPath
+			fileUriKey: toUriKey(u)
 		});
 
 		toc.push(...tocItemsForFile);
 		files.push({
 			fileIndex: i,
 			fileName,
-			fileFsPath: u.fsPath
+			fileUriKey: toUriKey(u)
 		});
 
 		sectionsHtml.push(`
@@ -554,13 +557,17 @@ function buildTocHtml(files: TocFile[], items: TocItem[]): string {
 		const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
 		html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
 		for (const it of arr) {
-			html += `<div class="toc-item-row lvl-${it.level}">
+				html += `<div class="toc-item-row lvl-${it.level}">
   <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>
-  <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-path="${escapeHtml(it.fileFsPath)}" data-line="${it.sourceLine}">✎</button>
+  <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-uri-key="${escapeHtml(it.fileUriKey)}" data-line="${it.sourceLine}">✎</button>
 </div>`;
+			}
 		}
-	}
 	return html;
+}
+
+function toUriKey(uri: vscode.Uri): string {
+	return uri.toString();
 }
 
 function toPathKey(fsPath: string): string {

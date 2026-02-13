@@ -18,7 +18,7 @@ VS Code拡張として、ファイルエクスプローラーで選択したMark
 - スクロール中は、現在表示中（画面上端にかかっている）ファイルヘッダー（`summary.file-summary`）を上端に固定表示する。
 - 見出し（h1〜h6）にアンカーIDを付与し、TOCから該当見出しへスクロールできる。
 - TOC操作時、対象見出しを含むファイルセクションが折りたたまれている場合は自動で展開し、ファイルヘッダー（`summary.file-summary`）高さ分のオフセットを考慮して遷移する。
-- TOC 見出し行（`toc-item-row`）の編集ボタンから、対象見出しの行位置でMarkdownを右側の編集タブに開ける。
+- TOC 見出し行（`toc-item-row`）の編集ボタンから、対象見出しの行位置でMarkdownを編集タブに開ける。
 - 表示対象Markdownの保存時、Concat View を自動再描画して内容を同期する。
 - Markdownのレンダリングは `markdown-it` を利用し、HTML生埋め込みは無効化（`html: false`）。
 - Webview側で最小限のMarkdownスタイルを付与している。

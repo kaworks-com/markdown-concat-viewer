@@ -71,12 +71,12 @@ suite('Extension Test Suite', () => {
 		const first = __test__.renderMarkdownWithAnchors(md, '# First', {
 			fileIndex: 0,
 			fileName: 'a.md',
-			fileFsPath: '/tmp/a.md'
+			fileUriKey: 'file:///tmp/a.md'
 		});
 		const second = __test__.renderMarkdownWithAnchors(md, '# Second', {
 			fileIndex: 1,
 			fileName: 'b.md',
-			fileFsPath: '/tmp/b.md'
+			fileUriKey: 'file:///tmp/b.md'
 		});
 
 		assert.ok(first.html.includes('id="cmv-0-0-first"'));
@@ -93,12 +93,12 @@ suite('Extension Test Suite', () => {
 				files: [{
 					fileIndex: 0,
 					fileName: 'a.md',
-					fileFsPath: '/tmp/a.md'
+					fileUriKey: 'file:///tmp/a.md'
 				}],
 				toc: [{
 					fileIndex: 0,
 					fileName: 'a.md',
-					fileFsPath: '/tmp/a.md',
+					fileUriKey: 'file:///tmp/a.md',
 					level: 1,
 					text: 'H1',
 					anchorId: 'cmv-0-0-h1',
@@ -118,12 +118,12 @@ suite('Extension Test Suite', () => {
 			[{
 				fileIndex: 0,
 				fileName: 'a.md',
-				fileFsPath: '/tmp/a.md'
+				fileUriKey: 'file:///tmp/a.md'
 			}],
 			[{
 				fileIndex: 0,
 				fileName: 'a.md',
-				fileFsPath: '/tmp/a.md',
+				fileUriKey: 'file:///tmp/a.md',
 				level: 1,
 				text: 'H1',
 				anchorId: 'cmv-0-0-h1',
@@ -132,7 +132,7 @@ suite('Extension Test Suite', () => {
 		);
 
 		assert.ok(html.includes('class="toc-edit-button"'));
-		assert.ok(html.includes('data-file-path="/tmp/a.md"'));
+		assert.ok(html.includes('data-file-uri-key="file:///tmp/a.md"'));
 		assert.ok(html.includes('data-line="12"'));
 	});
 });
