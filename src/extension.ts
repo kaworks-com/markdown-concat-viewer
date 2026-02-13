@@ -6,11 +6,16 @@ import markdownit from 'markdown-it';
 
 type TocItem = {
 	fileIndex: number;
-	filePath: string;
 	fileName: string;
 	level: number; // 1..6
 	text: string;
 	anchorId: string;
+};
+
+type TocFile = {
+	fileIndex: number;
+	fileName: string;
+	fileFsPath: string;
 };
 
 export function activate(context: vscode.ExtensionContext) {
@@ -44,41 +49,37 @@ export function activate(context: vscode.ExtensionContext) {
 					}
 				);
 
-				const md = createMarkdownIt();
-				const toc: TocItem[] = [];
+				const markdownPathSet = new Set(mdUris.map((u) => toPathKey(u.fsPath)));
+				const renderView = async () => {
+					panel.webview.html = await buildPanelHtml(panel.webview, mdUris);
+				};
 
-				const sectionsHtml: string[] = [];
-				for (let i = 0; i < mdUris.length; i++) {
-					const u = mdUris[i];
-					const buf = await vscode.workspace.fs.readFile(u);
-					const text = new TextDecoder().decode(buf);
-					const displayPath = toProjectRelativePath(u);
-
-					const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
-						fileIndex: i,
-						filePath: displayPath,
-						fileName: path.basename(u.fsPath)
-					});
-
-					toc.push(...tocItemsForFile);
-
-					sectionsHtml.push(`
-  <details class="file-section" data-file-index="${i}" open>
-    <summary class="file-summary">
-      <div class="file-title">${escapeHtml(path.basename(u.fsPath))}</div>
-      <div class="file-path">${escapeHtml(displayPath)}</div>
-    </summary>
-    <div class="file-body markdown-body">
-      ${html}
-    </div>
-  </details>
-`);
-				}
-
-				panel.webview.html = buildWebviewHtml(panel.webview, {
-					toc,
-					contentHtml: sectionsHtml.join("\n")
+				panel.webview.onDidReceiveMessage(async (message) => {
+					if (!message || message.type !== "openMarkdownForEdit" || typeof message.filePath !== "string") {
+						return;
+					}
+					if (!markdownPathSet.has(toPathKey(message.filePath))) {
+						return;
+					}
+					try {
+						await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(message.filePath));
+					} catch {
+						vscode.window.showErrorMessage("Markdownファイルを編集タブで開けませんでした。");
+					}
 				});
+
+				const saveListener = vscode.workspace.onDidSaveTextDocument(async (doc) => {
+					if (!markdownPathSet.has(toPathKey(doc.uri.fsPath))) {
+						return;
+					}
+					await renderView();
+				});
+
+				panel.onDidDispose(() => {
+					saveListener.dispose();
+				});
+
+				await renderView();
 			}
 		)
 	);
@@ -185,7 +186,7 @@ function createMarkdownIt(): markdownit {
 function renderMarkdownWithAnchors(
 	md: markdownit,
 	markdownText: string,
-	file: { fileIndex: number; filePath: string; fileName: string }
+	file: { fileIndex: number; fileName: string }
 ): { html: string; tocItemsForFile: TocItem[] } {
 	const tocItems: TocItem[] = [];
 	let headingSeq = 0;
@@ -209,7 +210,6 @@ function renderMarkdownWithAnchors(
 
 		tocItems.push({
 			fileIndex: file.fileIndex,
-			filePath: file.filePath,
 			fileName: file.fileName,
 			level,
 			text,
@@ -230,12 +230,12 @@ function renderMarkdownWithAnchors(
 
 function buildWebviewHtml(
 	webview: vscode.Webview,
-	payload: { toc: TocItem[]; contentHtml: string }
+	payload: { files: TocFile[]; toc: TocItem[]; contentHtml: string }
 ): string {
 	const nonce = getNonce();
 
 	// TOCはHTMLを自前生成（安全のため text は escape）
-	const tocHtml = buildTocHtml(payload.toc);
+	const tocHtml = buildTocHtml(payload.files, payload.toc);
 
 	// 最低限のCSP。styleは埋め込み、scriptはnonceで許可。
 	const csp = [
@@ -275,8 +275,38 @@ function buildWebviewHtml(
   .toc .group-title {
     font-size: 1rem;
     color: var(--muted);
-    margin: 14px 6px 6px;
+    margin: 14px 0 6px;
     word-break: break-all;
+  }
+  .toc .group-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 6px;
+  }
+  .toc .toc-edit-button {
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease-out;
+  }
+  .toc .group-row:hover .toc-edit-button,
+  .toc .group-row:focus-within .toc-edit-button {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .toc .toc-edit-button:hover {
+    background: rgba(127,127,127,0.2);
   }
   .toc a {
     display: block;
@@ -378,6 +408,21 @@ function buildWebviewHtml(
 </div>
 
 <script nonce="${nonce}">
+  const vscodeApi = acquireVsCodeApi();
+
+  document.querySelectorAll('.toc .toc-edit-button[data-file-path]').forEach(button => {
+    button.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const filePath = button.getAttribute('data-file-path');
+      if (!filePath) return;
+      vscodeApi.postMessage({
+        type: 'openMarkdownForEdit',
+        filePath
+      });
+    });
+  });
+
   // TOCクリックで該当idへスクロール（本文ペイン内）
   document.querySelectorAll('.toc a[data-anchor]').forEach(a => {
     a.addEventListener('click', (e) => {
@@ -421,8 +466,57 @@ function buildWebviewHtml(
 </html>`;
 }
 
-function buildTocHtml(items: TocItem[]): string {
-	// ファイルごとにグルーピング
+async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Promise<string> {
+	const md = createMarkdownIt();
+	const toc: TocItem[] = [];
+	const files: TocFile[] = [];
+	const sectionsHtml: string[] = [];
+
+	for (let i = 0; i < mdUris.length; i++) {
+		const u = mdUris[i];
+		const buf = await vscode.workspace.fs.readFile(u);
+		const text = new TextDecoder().decode(buf);
+		const displayPath = toProjectRelativePath(u);
+		const fileName = path.basename(u.fsPath);
+
+		const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
+			fileIndex: i,
+			fileName
+		});
+
+		toc.push(...tocItemsForFile);
+		files.push({
+			fileIndex: i,
+			fileName,
+			fileFsPath: u.fsPath
+		});
+
+		sectionsHtml.push(`
+  <details class="file-section" data-file-index="${i}" open>
+    <summary class="file-summary">
+      <div class="file-title">${escapeHtml(fileName)}</div>
+      <div class="file-path">${escapeHtml(displayPath)}</div>
+    </summary>
+    <div class="file-body markdown-body">
+      ${html}
+    </div>
+  </details>
+`);
+	}
+
+	return buildWebviewHtml(webview, {
+		files,
+		toc,
+		contentHtml: sectionsHtml.join("\n")
+	});
+}
+
+function buildTocHtml(files: TocFile[], items: TocItem[]): string {
+	const fileMap = new Map<number, TocFile>();
+	for (const file of files) {
+		fileMap.set(file.fileIndex, file);
+	}
+
 	const byFile = new Map<number, TocItem[]>();
 	for (const it of items) {
 		const arr = byFile.get(it.fileIndex) ?? [];
@@ -431,14 +525,25 @@ function buildTocHtml(items: TocItem[]): string {
 	}
 
 	let html = "";
-	for (const [fileIndex, arr] of [...byFile.entries()].sort((a, b) => a[0] - b[0])) {
-		const fileName = arr[0]?.fileName ?? `file-${fileIndex}`;
-		html += `<div class="group-title">${escapeHtml(fileName)}</div>`;
+	for (const file of files) {
+		const arr = byFile.get(file.fileIndex) ?? [];
+		const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
+		html += `<div class="group-row">
+  <div class="group-title">${escapeHtml(fileName)}</div>
+  <button class="toc-edit-button" type="button" title="このMarkdownを編集で開く" aria-label="このMarkdownを編集で開く" data-file-path="${escapeHtml(file.fileFsPath)}">✎</button>
+</div>`;
 		for (const it of arr) {
 			html += `<a href="#" class="lvl-${it.level}" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>`;
 		}
 	}
 	return html;
+}
+
+function toPathKey(fsPath: string): string {
+	if (process.platform === "win32") {
+		return fsPath.toLowerCase();
+	}
+	return fsPath;
 }
 
 function slugify(s: string): string {

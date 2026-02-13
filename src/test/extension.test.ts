@@ -70,12 +70,10 @@ suite('Extension Test Suite', () => {
 		const md = __test__.createMarkdownIt();
 		const first = __test__.renderMarkdownWithAnchors(md, '# First', {
 			fileIndex: 0,
-			filePath: 'docs/a.md',
 			fileName: 'a.md'
 		});
 		const second = __test__.renderMarkdownWithAnchors(md, '# Second', {
 			fileIndex: 1,
-			filePath: 'docs/b.md',
 			fileName: 'b.md'
 		});
 
@@ -89,9 +87,13 @@ suite('Extension Test Suite', () => {
 		const html = __test__.buildWebviewHtml(
 			{ cspSource: 'vscode-webview://test' } as unknown as vscode.Webview,
 			{
+				files: [{
+					fileIndex: 0,
+					fileName: 'a.md',
+					fileFsPath: '/tmp/a.md'
+				}],
 				toc: [{
 					fileIndex: 0,
-					filePath: 'docs/a.md',
 					fileName: 'a.md',
 					level: 1,
 					text: 'H1',
@@ -104,5 +106,25 @@ suite('Extension Test Suite', () => {
 		assert.ok(html.includes('section.open = true;'));
 		assert.ok(html.includes('const summaryHeight'));
 		assert.ok(html.includes('offsetTop = summaryHeight + 8'));
+	});
+
+	test('buildTocHtml はファイル行に編集ボタンを含める', () => {
+		const html = __test__.buildTocHtml(
+			[{
+				fileIndex: 0,
+				fileName: 'a.md',
+				fileFsPath: '/tmp/a.md'
+			}],
+			[{
+				fileIndex: 0,
+				fileName: 'a.md',
+				level: 1,
+				text: 'H1',
+				anchorId: 'cmv-0-0-h1'
+			}]
+		);
+
+		assert.ok(html.includes('class="toc-edit-button"'));
+		assert.ok(html.includes('data-file-path="/tmp/a.md"'));
 	});
 });
