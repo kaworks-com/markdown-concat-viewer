@@ -31,7 +31,7 @@ jobs:
       - name: Package VSIX
         id: package
         run: |
-          VSIX_NAME=$(node -p "const p=require('./package.json'); `${p.name}-${p.version}.vsix`")
+          VSIX_NAME=$(node -p "const p=require('./package.json'); p.name + '-' + p.version + '.vsix'")
           npx @vscode/vsce package --out "$VSIX_NAME"
           echo "vsix_path=$VSIX_NAME" >> "$GITHUB_OUTPUT"
 
