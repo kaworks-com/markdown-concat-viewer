@@ -20,6 +20,17 @@
     "working memory"
   ],
   "icon": "icon.png",
+  "files": [
+    "dist/**",
+    "package.json",
+    "package.nls.json",
+    "package.nls.ja.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
+    "icon.png"
+  ],
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
@@ -62,7 +73,8 @@
     "pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "test:wsl": "xvfb-run -a vscode-test"
   },
   "devDependencies": {
     "@types/markdown-it": "^14.1.2",

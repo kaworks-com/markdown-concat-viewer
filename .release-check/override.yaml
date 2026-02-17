@@ -1,0 +1,48 @@
+version: "v0.3.1"
+branch: "main"
+remote: "origin"
+target_commit: "HEAD"
+repository: "kaworks-com/markdown-concat-viewer"
+
+gates:
+  - name: "Gate 1: リリース対象整合"
+    checks:
+      - 次のバージョンをgh release viewで確認する
+      - "package.json の version が リポジトリの最後のバージョンタグよりも新しいことを確認する"
+      - "CHANGELOG.md に 次バージョンの更新内容が記載されている"
+      - "リリース対象ブランチが main である"
+      - "リリース対象コミットが意図した HEAD である"
+    error_message: "エラー: リリース対象整合チェックで不一致を検出しました。"
+
+  - name: "Gate 2: 品質ゲート"
+    checks:
+      - "yarn run check-types が通過"
+      - "yarn run lint が通過"
+      - "yarn run test:wsl が通過"
+      - "yarn run package が成功"
+    error_message: "エラー: 品質ゲート未通過です。"
+
+  - name: "Gate 3: 仕様・セキュリティ整合"
+    checks:
+      - "markdown-it の html: false 方針が維持されている"
+      - "フォルダ探索が直下のみ（再帰なし）を維持している"
+      - "Webview の CSP と nonce ベース許可が維持されている"
+      - "仕様変更がある場合は README.md と docs/specs/ が更新されている"
+    error_message: "エラー: 仕様・セキュリティ整合チェック未通過です。"
+
+release_commands:
+  pre_release:
+    - "LATEST_TAG=$(gh release list --repo kaworks-com/markdown-concat-viewer --limit 100 --json tagName,isDraft,isPrerelease,createdAt --jq 'map(select(.isDraft == false and .isPrerelease == false and (.tagName | test(\"^v[0-9]+\\.[0-9]+\\.[0-9]+$\")))) | sort_by(.createdAt) | last | .tagName'); if [ -z \"$LATEST_TAG\" ] || [ \"$LATEST_TAG\" = \"null\" ]; then LATEST_TAG=\"v0.0.0\"; fi; NEXT_VERSION=$(node -e 'const latest=process.argv[1]; const m=latest.match(/^v(\\d+)\\.(\\d+)\\.(\\d+)$/); if(!m){console.error(\"エラー: 最新リリースタグの形式が不正です。vX.Y.Z 形式を確認してください。\"); process.exit(1);} console.log(`v${m[1]}.${Number(m[2]) + 1}.0`);' \"$LATEST_TAG\"); echo \"$NEXT_VERSION\" > .release-check/.next_version; sed -i \"s/^version: \\\".*\\\"$/version: \\\"$NEXT_VERSION\\\"/\" .release-check/override.yaml; echo \"次リリースバージョン: $NEXT_VERSION\""
+    - "node -e 'const fs=require(\"fs\"); const pkg=require(\"./package.json\"); const next=fs.readFileSync(\".release-check/.next_version\", \"utf8\").trim(); const current=`v${pkg.version}`; if(current !== next){console.error(`エラー: package.json の version(${current}) と次リリースバージョン(${next}) が一致しません。`); process.exit(1);}'"
+    - "corepack enable"
+    - "yarn install --immutable"
+    - "yarn run check-types"
+    - "yarn run lint"
+    - "yarn run test:wsl"
+    - "yarn run package"
+  release:
+    - "git tag \"$(cat .release-check/.next_version)\""
+    - "git push origin \"$(cat .release-check/.next_version)\""
+  post_release:
+    - "gh release view \"$(cat .release-check/.next_version)\" --repo kaworks-com/markdown-concat-viewer"
+    - "echo \"公開後に VS Code Marketplace / OpenVSX の反映を確認する\""

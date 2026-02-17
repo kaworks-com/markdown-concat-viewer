@@ -22,7 +22,7 @@
 ```bash
 yarn run check-types
 yarn run lint
-yarn run test
+yarn run test:wsl
 ```
 
 ## ドキュメント整合
