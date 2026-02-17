@@ -6,6 +6,21 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-02-17
+
+### Added
+- Webview タブのコンテキストメニューから表示中タブ名を変更できる `Rename Tab` コマンドを追加
+- TOC の見出し行から、該当 Markdown を見出し行位置で編集タブに開く `edit` 導線を追加
+- 対象 Markdown 保存時に Concat View を自動リロードして表示を最新化する仕組みを追加
+
+### Changed
+- 複数の Concat View パネル状態を管理し、アクティブ状態に応じたコマンド表示制御を追加
+- README を Marketplace 向けの内容に更新し、仕様ドキュメント（`docs/specs/`）を拡充
+- コマンド文言のローカライズを更新（`package.nls.json` / `package.nls.ja.json`）
+
+### Fixed
+- リリースワークフローの `VSIX_NAME` 生成処理を修正
+
 ## [0.3.0] - 2026-02-13
 
 ### Changed
