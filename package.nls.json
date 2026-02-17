@@ -1,3 +1,4 @@
 {
-  "commands.markdownConcatViewer.openView.title": "Markdown Concat Viewer: Open"
+  "commands.markdownConcatViewer.openView.title": "Markdown Concat Viewer: Open",
+  "commands.markdownConcatViewer.renameTab.title": "Rename Tab"
 }

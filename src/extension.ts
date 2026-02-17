@@ -21,8 +21,41 @@ type TocFile = {
 };
 
 export function activate(context: vscode.ExtensionContext) {
+	const panels = new Set<vscode.WebviewPanel>();
+
+	const updateContextKey = () => {
+		const activePanel = vscode.window.tabGroups.activeTabGroup.activeTab?.input instanceof vscode.TabInputWebview
+			? Array.from(panels).find(p => p.viewType === (vscode.window.tabGroups.activeTabGroup.activeTab?.input as vscode.TabInputWebview).viewType)
+			: undefined;
+
+		// TabInputWebview 経由だと viewType が取れる保証がないため、単純に active なパネルが自分たちの管理下にあるかで判定する
+		// ただし、vscode.window.activeWebviewPanel は focus があるときしか取れない可能性がある
+		// ここではシンプルに「現在フォーカス中のWebviewPanelが管理リストにあるか」を見る
+		const isActive = Array.from(panels).some(p => p.active);
+		vscode.commands.executeCommand('setContext', 'markdownConcatViewerActive', isActive);
+	};
+
 	context.subscriptions.push(
+		vscode.window.onDidChangeActiveTextEditor(updateContextKey),
+		vscode.window.onDidChangeWindowState(updateContextKey),
 		vscode.commands.registerCommand(
+			"markdownConcatViewer.renameTab",
+			async () => {
+				const panel = Array.from(panels).find(p => p.active);
+				if (!panel) {
+					return;
+				}
+				const newTitle = await vscode.window.showInputBox({
+					prompt: "新しいタブ名を入力してください",
+					value: panel.title
+				});
+				if (newTitle) {
+					panel.title = newTitle;
+				}
+			}
+		),
+		vscode.commands.registerCommand(
+
 			"markdownConcatViewer.openView",
 			async (uri?: vscode.Uri, selectedUris?: vscode.Uri[]) => {
 				const uris = normalizeUris(uri, selectedUris);
@@ -50,6 +83,19 @@ export function activate(context: vscode.ExtensionContext) {
 						retainContextWhenHidden: true
 					}
 				);
+				panels.add(panel);
+				updateContextKey();
+
+				panel.onDidDispose(() => {
+					panels.delete(panel);
+					updateContextKey();
+				});
+
+				panel.onDidChangeViewState(() => {
+					if (panel.visible) {
+						updateContextKey();
+					}
+				});
 
 				const markdownPathSet = new Set(mdUris.map((u) => toPathKey(u.fsPath)));
 				const markdownUriMap = new Map(mdUris.map((u) => [toUriKey(u), u]));
@@ -557,12 +603,12 @@ function buildTocHtml(files: TocFile[], items: TocItem[]): string {
 		const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
 		html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
 		for (const it of arr) {
-				html += `<div class="toc-item-row lvl-${it.level}">
+			html += `<div class="toc-item-row lvl-${it.level}">
   <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>
   <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-uri-key="${escapeHtml(it.fileUriKey)}" data-line="${it.sourceLine}">✎</button>
 </div>`;
-			}
 		}
+	}
 	return html;
 }
 

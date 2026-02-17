@@ -1,3 +1,4 @@
 {
-  "commands.markdownConcatViewer.openView.title": "Markdownを結合して表示"
+  "commands.markdownConcatViewer.openView.title": "Markdownを結合して表示",
+  "commands.markdownConcatViewer.renameTab.title": "Markdownタブ名を変更"
 }

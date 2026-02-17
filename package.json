@@ -3,7 +3,7 @@
   "displayName": "markdown-concat-viewer-vs-code",
   "description": "Read multiple Markdown files as one. Minimize cognitive load by eliminating tab-switching.",
   "publisher": "Kaworks",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/kaworks-com/markdown-concat-viewer.git"
@@ -27,6 +27,10 @@
       {
         "command": "markdownConcatViewer.openView",
         "title": "%commands.markdownConcatViewer.openView.title%"
+      },
+      {
+        "command": "markdownConcatViewer.renameTab",
+        "title": "%commands.markdownConcatViewer.renameTab.title%"
       }
     ],
     "menus": {
@@ -35,6 +39,13 @@
           "command": "markdownConcatViewer.openView",
           "when": "explorerResourceIsFolder || resourceExtname == .md || resourceExtname == .markdown",
           "group": "navigation@60"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "markdownConcatViewer.renameTab",
+          "when": "markdownConcatViewerActive",
+          "group": "2_configuration"
         }
       ]
     }
