@@ -3,7 +3,7 @@
   "displayName": "markdown-concat-viewer-vs-code",
   "description": "Read multiple Markdown files as one. Minimize cognitive load by eliminating tab-switching.",
   "publisher": "Kaworks",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/kaworks-com/markdown-concat-viewer.git"
@@ -75,7 +75,7 @@
         },
         "markdownConcatViewer.preview.maxWidth": {
           "type": "number",
-          "default": 40,
+          "default": 74,
           "description": "Preview content max width (in characters)."
         },
         "markdownConcatViewer.toc.fontSize": {
