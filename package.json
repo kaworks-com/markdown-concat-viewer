@@ -59,6 +59,36 @@
           "group": "2_configuration"
         }
       ]
+    },
+    "configuration": {
+      "title": "Markdown Concat Viewer",
+      "properties": {
+        "markdownConcatViewer.preview.fontSize": {
+          "type": "number",
+          "default": 100,
+          "description": "%configuration.preview.fontSize.description%"
+        },
+        "markdownConcatViewer.preview.lineHeight": {
+          "type": "number",
+          "default": 175,
+          "description": "%configuration.preview.lineHeight.description%"
+        },
+        "markdownConcatViewer.preview.maxWidth": {
+          "type": "number",
+          "default": 40,
+          "description": "Preview content max width (in characters)."
+        },
+        "markdownConcatViewer.toc.fontSize": {
+          "type": "number",
+          "default": 12,
+          "description": "%configuration.toc.fontSize.description%"
+        },
+        "markdownConcatViewer.toc.minWidthChars": {
+          "type": "number",
+          "default": 20,
+          "description": "%configuration.toc.minWidthChars.description%"
+        }
+      }
     }
   },
   "scripts": {

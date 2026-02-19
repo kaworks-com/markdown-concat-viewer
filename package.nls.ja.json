@@ -1,4 +1,8 @@
 {
   "commands.markdownConcatViewer.openView.title": "Markdownを結合して表示",
-  "commands.markdownConcatViewer.renameTab.title": "Markdownタブ名を変更"
+  "commands.markdownConcatViewer.renameTab.title": "Markdownタブ名を変更",
+  "configuration.preview.fontSize.description": "プレビューペインのフォントサイズ (エディタフォントサイズに対する%)",
+  "configuration.preview.lineHeight.description": "プレビューペインの行間 (%)",
+  "configuration.toc.fontSize.description": "TOCペインのフォントサイズ (px)",
+  "configuration.toc.minWidthChars.description": "TOCペインの最小幅 (文字数)"
 }
