@@ -3,7 +3,7 @@
   "displayName": "markdown-concat-viewer-vs-code",
   "description": "Read multiple Markdown files as one. Minimize cognitive load by eliminating tab-switching.",
   "publisher": "Kaworks",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/kaworks-com/markdown-concat-viewer.git"
