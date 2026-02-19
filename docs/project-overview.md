@@ -21,8 +21,8 @@ VS Code拡張として、ファイルエクスプローラーで選択したMark
 - TOC操作時、対象見出しを含むファイルセクションが折りたたまれている場合は自動で展開し、ファイルヘッダー（`summary.file-summary`）高さ分のオフセットを考慮して遷移する。
 - TOC 見出し行（`toc-item-row`）の編集ボタンから、対象見出しの行位置でMarkdownを編集タブに開ける。
 - 表示対象Markdownの保存時、Concat View を自動再描画して内容を同期する。
+- Webview側でTOC表示モード（`expanded` / `minimized` / `overlay`）を動的制御する。
 - Markdownのレンダリングは `markdown-it` を利用し、HTML生埋め込みは無効化（`html: false`）。
-- Webview側で最小限のMarkdownスタイルを付与している。
 
 ## 主な処理フロー
 1. ファイルエクスプローラーから渡された `selectedUris` / `uri` を `normalizeUris` で正規化し、重複排除する。
@@ -34,7 +34,7 @@ VS Code拡張として、ファイルエクスプローラーで選択したMark
 7. TOCと本文を合成してWebviewへ描画する。
 
 ## 画面構成（Webview）
-- 本文ペイン（`content`）: 連結された Markdown 内容
+- 本文ペイン（`content`）: 連結された Markdown 内容（`height: 100vh; overflow: auto;`）
 - TOC ペイン（`toc`）: 目次と編集導線
 - 各ファイルはファイルセクション（`details.file-section`）単位で折りたたみ可能
 
@@ -53,9 +53,3 @@ VS Code拡張として、ファイルエクスプローラーで選択したMark
 - ファイルエクスプローラーで複数の仕様書/設計書Markdownを選択し、まとめて閲覧したい場合。
 - ファイルエクスプローラーでディレクトリを選択し、直下のMarkdown群をまとめて閲覧したい場合。
 - 同一テーマの分割MarkdownをTOCから素早く参照したい場合。
-
-## 次の作業候補（任意）
-- 再帰的なディレクトリ探索（深さ指定、除外パターン）を設定可能にする。
-- READMEの具体化（スクリーンショット・使い方・設定）。
-- テスト追加（ディレクトリ選択、重複排除、TOC生成、アンカー検証）。
-- 表示スタイルの強化（VS Codeテーマ連携、コードブロックの見栄え改善）。

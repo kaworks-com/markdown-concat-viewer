@@ -1,6 +1,6 @@
 # 設定仕様書
 
-`markdownConcatViewer` 拡張機能で利用可能な設定項目（`contributes.configuration`）と、その挙動について記述する。
+`markdownConcatViewer` 拡張機能で利用可能な設定項目（`contributes.configuration`）と、その挙動を記述する。
 
 ## 設定一覧
 
@@ -8,28 +8,33 @@
 | :--- | :--- | :--- | :--- |
 | `markdownConcatViewer.preview.fontSize` | number | 100 | 本文プレビューの基本フォントサイズ。<br>VS Codeの **エディタフォントサイズ (`editor.fontSize`) に対するパーセンテージ** で指定する。<br>例: `100` = エディタと同じサイズ、`120` = エディタの1.2倍 |
 | `markdownConcatViewer.preview.lineHeight` | number | 175 | 本文プレビューの行間。<br>パーセンテージで指定する。<br>例: `175` = 行間 1.75 |
-| `markdownConcatViewer.toc.fontSize` | number | 12 | TOC（目次）ペインの基本フォントサイズ (px)。<br>固定ピクセル値で指定する。 |
-| `markdownConcatViewer.toc.minWidthChars` | number | 20 | TOCペインの最小幅。<br>「TOCのフォントサイズ」で何文字分入るかを基準に幅を計算する。<br>計算式: `(toc.fontSize * toc.minWidthChars) + 24px` |
+| `markdownConcatViewer.preview.maxWidth` | number | 40 | 本文の最大表示幅（`ch` 単位換算）。 |
+| `markdownConcatViewer.toc.fontSize` | number | 12 | TOC（目次）ペインの基本フォントサイズ（px）。 |
+| `markdownConcatViewer.toc.minWidthChars` | number | 20 | TOCペインの基準幅（文字数換算）。<br>計算式: `(toc.fontSize * toc.minWidthChars) + 24px` |
 
 ## 挙動詳細
 
 ### フォントサイズと行間の適用
 
-- **Webview起動時**: 設定値を読み込み、CSS変数としてWebview内の `:root` に注入する。
-  - `--preview-font-size`: `editor.fontSize` * (`preview.fontSize` / 100) px
-  - `--preview-line-height`: `preview.lineHeight` / 100
+- Webview起動時に設定値を読み込み、CSS変数として `:root` に注入する。
+  - `--preview-font-size`: `editor.fontSize * (preview.fontSize / 100)` px
+  - `--preview-line-height`: `preview.lineHeight / 100`
+  - `--content-max-width`: `preview.maxWidth` ch
   - `--toc-font-size`: `toc.fontSize` px
-- **設定変更時**: `vscode.workspace.onDidChangeConfiguration` イベントを監視し、設定値が変更された場合はWebviewを即座に再描画（リロード）して新しいスタイルを適用する。
+  - `--toc-width`: `(toc.fontSize * toc.minWidthChars) + 24` px
+- 設定変更時は `vscode.workspace.onDidChangeConfiguration` で `markdownConcatViewer` 配下の変更を監視し、Webviewを再描画して即時反映する。
+
+### TOCペインのレイアウト制御
+
+- TOCは `expanded` / `minimized` / `overlay` の3モードで表示される。
+- 自動判定のしきい値:
+  - TOC最小化: `tocWidth / windowWidth > 0.30`
+  - オーバーレイ: `windowWidth - tocWidth < 600`
+- 最小化時のTOC幅は `--toc-minimized-width: 60px`。
 
 ### 本文ペインの見出しスタイル
 
-本文ペインの各見出し (`h1`〜`h6`) は、視認性を確保するため以下のルールでスタイルが適用される。
+本文ペインの見出し（`h1`〜`h6`）は、視認性確保のため以下で固定される。
 
 - `margin-top`: `1.2em`
-- `line-height`: `1.3` (固定)
-  - `preview.lineHeight` の設定値にかかわらず、見出しの行間はタイトに保たれる。
-
-### TOCペインのレイアウト
-
-- **幅の計算**: `toc.fontSize` と `toc.minWidthChars` に基づいて固定幅（ピクセル）が計算され、Webviewのグリッドレイアウト (`grid-template-columns`) に適用される。
-- **テキストの折り返し**: TOC内のリンクテキストが計算された幅を超える場合、省略 (`...`) せずに折り返して表示する (`word-break: break-all`)。
+- `line-height`: `1.3`

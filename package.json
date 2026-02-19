@@ -73,6 +73,11 @@
           "default": 175,
           "description": "%configuration.preview.lineHeight.description%"
         },
+        "markdownConcatViewer.preview.maxWidth": {
+          "type": "number",
+          "default": 40,
+          "description": "Preview content max width (in characters)."
+        },
         "markdownConcatViewer.toc.fontSize": {
           "type": "number",
           "default": 12,

@@ -310,6 +310,7 @@ function buildWebviewHtml(
     config: {
       previewFontSize: number;
       previewLineHeight: number;
+      previewMaxWidth: number;
       tocFontSize: number;
       tocMinWidthChars: number;
     };
@@ -350,9 +351,10 @@ function buildWebviewHtml(
     --muted: rgba(127,127,127,0.8);
     --preview-font-size: ${previewFontSizePx}px;
     --preview-line-height: ${payload.config.previewLineHeight / 100};
+    --content-max-width: ${payload.config.previewMaxWidth}ch;
     --toc-font-size: ${payload.config.tocFontSize}px;
     --toc-width: ${tocWidth}px;
-    --toc-minimized-width: 48px;
+    --toc-minimized-width: 60px;
     --toc-bg: var(--vscode-editor-background);
   }
   body {
@@ -370,21 +372,44 @@ function buildWebviewHtml(
   }
   /* 最小化モード時のレイアウト */
   .layout[data-toc-mode="minimized"] {
-    grid-template-columns: 1fr var(--toc-minimized-width);
+    display: block;
+    margin-right: var(--toc-minimized-width);
+  }
+  /* オーバーレイモード時のレイアウト */
+  .layout[data-toc-mode="overlay"] {
+    display: block; /* grid解除してフロー配置にする */
+    position: relative;
+  }
+  .layout[data-toc-mode="overlay"] .content {
+    width: 100%; /* 全幅使う */
+    box-sizing: border-box;
   }
 
   .toc {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
     border-left: 1px solid var(--border);
     overflow: auto;
     padding: 12px 10px;
     font-size: var(--toc-font-size);
-    position: relative;
     background-color: var(--toc-bg);
-    transition: padding 0.2s;
+    transition: padding 0.2s, box-shadow 0.2s, transform 0.2s;
+    z-index: 10;
   }
   .layout[data-toc-mode="minimized"] .toc {
+    box-sizing: border-box;
+    width: var(--toc-minimized-width);
     padding: 12px 4px;
     overflow-x: hidden;
+  }
+  .layout[data-toc-mode="overlay"] .toc {
+    position: fixed;
+    width: var(--toc-width);
+    box-shadow: -2px 0 12px rgba(0,0,0,0.3);
+    border-left: 1px solid var(--border);
+    z-index: 100; /* 最前面へ */
   }
 
   /* トグルボタン */
@@ -402,9 +427,9 @@ function buildWebviewHtml(
     border-radius: 4px;
     background: var(--vscode-button-secondaryBackground);
     color: var(--vscode-button-secondaryForeground);
-    font-size: 12px;
+    font-size: 10px;
     cursor: pointer;
-    z-index: 10;
+    z-index: 20;
     margin-bottom: 8px;
     opacity: 0.6;
   }
@@ -493,9 +518,9 @@ function buildWebviewHtml(
   }
   .layout[data-toc-mode="minimized"] .toc-link {
     font-size: 0; /* 文字隠し */
-    padding: 4px;
+    padding: 2px;
     text-align: center;
-    height: 4px;
+    height: 2px;
     border-radius: 0;
     background: transparent;
     position: relative;
@@ -558,14 +583,14 @@ function buildWebviewHtml(
 
   .content {
     overflow: auto;
-    padding: 0 0 40px;
+    padding: 0;
+    height: 100vh;
     font-size: var(--preview-font-size);
     line-height: var(--preview-line-height);
   }
   .file-section {
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 18px;
+    border-top: 2px solid var(--border);
+    margin-bottom: 2rem;
     overflow: visible;
   }
 
@@ -619,7 +644,10 @@ function buildWebviewHtml(
   }
   .file-body {
     padding: 12px 1rem 12px 2rem;
-    max-width: 41rem;
+    max-width: var(--content-max-width);
+    box-sizing: content-box; /* paddingを含めずにmax-widthを適用 */
+    margin-left: auto;
+    margin-right: auto;
   }
   /* 最低限のMarkdown表示（必要に応じて拡張） */
   .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 { margin-top: 1.2em; line-height: 1.3; }
@@ -658,29 +686,74 @@ function buildWebviewHtml(
     // CSS変数の値を取得（単位 'px' を除去）
     const tocWidthStyle = getComputedStyle(document.documentElement).getPropertyValue('--toc-width');
     const tocWidth = parseInt(tocWidthStyle, 10);
+    const fontSize = parseFloat(getComputedStyle(document.body).fontSize); // px単位
     
-    // 30% ルール
-    const isNarrow = (tocWidth / windowWidth) > 0.30;
+    // Config値の取得 (CSS変数から)
+    // --content-max-width: 40ch
+    const contentMaxWidthChStyle = getComputedStyle(document.documentElement).getPropertyValue('--content-max-width');
+    const contentMaxWidthCh = parseInt(contentMaxWidthChStyle, 10) || 40;
     
+    // 30% ルール（最小化判定）
+    const isNarrowForToc = (tocWidth / windowWidth) > 0.30;
+    
+    // 本文幅確保ルール（オーバーレイ判定）
+    // 本文領域として確保したい幅の目安を計算 (ch -> px概算 + padding)
+    // ch単位は概ね 0.5em ~ 1em の間だが、安全側に倒して 1ch = 1emと仮定するか、ブラウザ依存に任せるのも手だが、
+    // ここでは「残りの幅」が「設定された maxWidth」よりも著しく狭くなる場合を検出したい。
+    // 「著しく狭い」の定義: 例えば maxWidth の 80% も確保できない、または固定で 400px 切るなど。
+    // ここではシンプルに「ウィンドウ幅 - TOC幅」が「最小限必要な本文幅」を下回る場合とする。
+    // 最小限必要な本文幅 = 400px (スマホ幅程度) と仮置きするか、あるいは設定値に基づくか。
+    // ユーザー要望: "TOCを展開した際本文表示幅が確保できくなる場合に...文字列の回り込みで視覚と認知の影響が出ることを防ぎたい"
+    // これは content-max-width (例えば40文字) が維持できない場合を指していると解釈できる。
+    // つまり (WindowWidth - TOCWidth) < (ContentMaxWidthPx + Padding)
+    
+    // 1ch の幅を概算 (monospaceなら1ch=1文字幅だが、システムフォントだと可変)
+    // 簡易的に 1ch = 0.6em 程度と仮定してもよいが、安全策で 10px 程度と見積もるか、あるいは「表示可能領域」で判断。
+    // ここでは、ウィンドウ幅からTOC幅を引いた残りが 600px を切る場合はオーバーレイにする、という安全策を取る。
+    // または、設定された max-width より狭くなる場合。
+    
+    // 簡易実装として「残り幅 < 600px」を閾値とする
+    const remainingWidth = windowWidth - tocWidth;
+    const isContentSqueezed = remainingWidth < 600; // 600px未満なら苦しいと判定
+
     // 決定優先順位: 1. ユーザーの手動設定, 2. 自動判定
     let mode = 'expanded';
     
-    if (tocState.userOverride) {
-      mode = tocState.userOverride;
+    if (tocState.userOverride === 'minimized') {
+      mode = 'minimized';
     } else {
-      mode = isNarrow ? 'minimized' : 'expanded';
+      // ユーザーが 'expanded' (表示) を望んでいる、または未設定の場合
+      // まず自動判定でモード候補を決める
+      let autoMode = 'expanded';
+      if (!tocState.userOverride && isNarrowForToc) {
+        autoMode = 'minimized';
+      } else if (isContentSqueezed) {
+        autoMode = 'overlay';
+      } else {
+        autoMode = 'expanded';
+      }
+
+      // ユーザー設定が 'expanded' の場合でも、物理的に無理(overlay条件)なら overlay にする
+      // ただし、「最小化」はユーザーが明示しない限り勝手にはしない（ 'minimized' にはならない）
+      if (tocState.userOverride === 'expanded') {
+         if (isContentSqueezed) {
+             mode = 'overlay';
+         } else {
+             mode = 'expanded';
+         }
+      } else {
+         // userOverrideなし -> 完全自動
+         mode = autoMode;
+      }
     }
     
     layout.setAttribute('data-toc-mode', mode);
-    toggleBtn.textContent = mode === 'minimized' ? '◀' : '▶'; // ◀で展開、▶で格納のイメージ（配置による）
-    
-    // 右配置TOCの場合: 
-    // expanded(通常) -> ボタンは「▶」(閉じるイメージ？) あるいは「畳む」アイコン
-    // minimized(細い) -> ボタンは「◀」(開くイメージ？)
-    if (mode === 'expanded') {
-        toggleBtn.textContent = '▶|'; // 簡易アイコン
+
+    // トグルボタンの表示制御
+    if (mode === 'expanded' || mode === 'overlay') {
+        toggleBtn.textContent = '▶|'; // 閉じるイメージ
     } else {
-        toggleBtn.textContent = '|◀';
+        toggleBtn.textContent = '|◀'; // 開くイメージ
     }
   }
 
@@ -690,9 +763,13 @@ function buildWebviewHtml(
   // イベントリスナー: トグルボタン
   toggleBtn.addEventListener('click', () => {
     const currentMode = layout.getAttribute('data-toc-mode');
-    const newMode = currentMode === 'expanded' ? 'minimized' : 'expanded';
+    
+    // expanded/overlay <-> minimized のトグル
+    // 現在が表示系(expanded/overlay)ならminimizedへ、そうでなければexpandedへ
+    const newMode = (currentMode === 'minimized') ? 'expanded' : 'minimized';
     
     // ユーザー設定として保存
+    // 'overlay' は自動算出結果なので、ユーザー設定としては 'expanded' (表示する意志) を保存する
     tocState.userOverride = newMode;
     vscodeApi.setState(tocState);
     
@@ -813,6 +890,7 @@ async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Pr
     config: {
       previewFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.fontSize", 100),
       previewLineHeight: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.lineHeight", 175),
+      previewMaxWidth: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.maxWidth", 40),
       tocFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.fontSize", 12),
       tocMinWidthChars: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.minWidthChars", 20)
     }
@@ -839,7 +917,7 @@ function buildTocHtml(files: TocFile[], items: TocItem[]): string {
     html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
     for (const it of arr) {
       html += `<div class="toc-item-row lvl-${it.level}">
-  <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(it.text)}">${escapeHtml(it.text || "(no title)")}</a>
+  <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(fileName + " - " + it.text)}">${escapeHtml(it.text || "(no title)")}</a>
   <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-uri-key="${escapeHtml(it.fileUriKey)}" data-line="${it.sourceLine}">✎</button>
 </div>`;
     }

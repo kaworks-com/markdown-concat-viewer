@@ -109,7 +109,8 @@ suite('Extension Test Suite', () => {
 					previewFontSize: 100,
 					previewLineHeight: 175,
 					tocFontSize: 12,
-					tocMinWidthChars: 20
+					tocMinWidthChars: 20,
+					previewMaxWidth: 40
 				}
 			}
 		);
