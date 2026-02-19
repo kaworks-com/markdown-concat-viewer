@@ -1,7 +1,8 @@
 # プロジェクト概要（markdown-concat-viewer-vs-code）
 
 関連資料:
-- 画面パーツ用語集: `docs/specs/glossary-ui-parts.md`
+- 画面パーツ用語集: `docs/reference/glossary-ui-parts.md`
+- 設定仕様書: `docs/reference/configuration.md`
 
 ## 目的
 VS Code拡張として、ファイルエクスプローラーで選択したMarkdownファイル、または選択ディレクトリ直下のMarkdownファイルを1つのビューで連結表示し、ファイル単位の折りたたみと目次（TOC）で素早く閲覧できるようにする。
@@ -46,7 +47,6 @@ VS Code拡張として、ファイルエクスプローラーで選択したMark
 - ディレクトリ展開は直下のみで、サブディレクトリ配下のMarkdownは対象外。
 - `markdownConcatViewer.openView` はファイルエクスプローラー経由で渡されたURIに依存しているため、選択コンテキストなしでの起動時は対象ファイルが解決できない。
 - テストはサンプルのみで、実機能のテストは未実装。
-- 設定項目（`contributes.configuration`）やユーザー向けの拡張設定は未実装。
 - 表示スタイルは最小限で、VS Codeテーマとの同期やハイライト拡張は未対応。
 
 ## 期待される利用シナリオ

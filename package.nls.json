@@ -1,4 +1,8 @@
 {
   "commands.markdownConcatViewer.openView.title": "Markdown Concat Viewer: Open",
-  "commands.markdownConcatViewer.renameTab.title": "Rename Tab"
+  "commands.markdownConcatViewer.renameTab.title": "Rename Tab",
+  "configuration.preview.fontSize.description": "Font size for the preview pane (% of Editor Font Size)",
+  "configuration.preview.lineHeight.description": "Line height for the preview pane (%)",
+  "configuration.toc.fontSize.description": "Font size for the TOC pane (px)",
+  "configuration.toc.minWidthChars.description": "Minimum width for the TOC pane (number of characters)"
 }

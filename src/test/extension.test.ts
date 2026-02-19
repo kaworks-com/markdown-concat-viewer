@@ -104,7 +104,13 @@ suite('Extension Test Suite', () => {
 					anchorId: 'cmv-0-0-h1',
 					sourceLine: 1
 				}],
-				contentHtml: '<details class="file-section"><summary class="file-summary">a.md</summary><h1 id="cmv-0-0-h1">H1</h1></details>'
+				contentHtml: '<details class="file-section"><summary class="file-summary">a.md</summary><h1 id="cmv-0-0-h1">H1</h1></details>',
+				config: {
+					previewFontSize: 100,
+					previewLineHeight: 175,
+					tocFontSize: 12,
+					tocMinWidthChars: 20
+				}
 			}
 		);
 

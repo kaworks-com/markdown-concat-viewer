@@ -136,8 +136,15 @@ export function activate(context: vscode.ExtensionContext) {
 					await renderView();
 				});
 
+				const configListener = vscode.workspace.onDidChangeConfiguration(async (e) => {
+					if (e.affectsConfiguration("markdownConcatViewer")) {
+						await renderView();
+					}
+				});
+
 				panel.onDidDispose(() => {
 					saveListener.dispose();
+					configListener.dispose();
 				});
 
 				await renderView();
@@ -296,7 +303,17 @@ function renderMarkdownWithAnchors(
 
 function buildWebviewHtml(
 	webview: vscode.Webview,
-	payload: { files: TocFile[]; toc: TocItem[]; contentHtml: string }
+	payload: {
+		files: TocFile[];
+		toc: TocItem[];
+		contentHtml: string;
+		config: {
+			previewFontSize: number;
+			previewLineHeight: number;
+			tocFontSize: number;
+			tocMinWidthChars: number;
+		};
+	}
 ): string {
 	const nonce = getNonce();
 
@@ -311,6 +328,15 @@ function buildWebviewHtml(
 		`script-src 'nonce-${nonce}'`
 	].join("; ");
 
+	// TOC幅の計算: 文字サイズ * 文字数 + パディング等の概算
+	// 20px は左右padding(10px*2)分、スクロールバー等も考慮して少し余裕を持たせるなら調整
+	const tocWidth = (payload.config.tocFontSize * payload.config.tocMinWidthChars) + 24;
+
+	// エディタのフォントサイズを取得（デフォルト14px）
+	const editorFontSize = vscode.workspace.getConfiguration("editor").get<number>("fontSize", 14);
+	// 設定値は％なので、エディタフォントサイズに対する割合で計算
+	const previewFontSizePx = editorFontSize * (payload.config.previewFontSize / 100);
+
 	return `<!doctype html>
 <html lang="ja">
 <head>
@@ -322,6 +348,10 @@ function buildWebviewHtml(
   :root {
     --border: rgba(127,127,127,0.25);
     --muted: rgba(127,127,127,0.8);
+    --preview-font-size: ${previewFontSizePx}px;
+    --preview-line-height: ${payload.config.previewLineHeight / 100};
+    --toc-font-size: ${payload.config.tocFontSize}px;
+    --toc-width: ${tocWidth}px;
   }
   body {
     margin: 0;
@@ -330,16 +360,17 @@ function buildWebviewHtml(
   }
   .layout {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr var(--toc-width);
     height: 100vh;
   }
   .toc {
     border-left: 1px solid var(--border);
     overflow: auto;
     padding: 12px 10px;
+    font-size: var(--toc-font-size);
   }
   .toc .group-title {
-    font-size: 1rem;
+    font-size: 1em;
     color: var(--muted);
     margin: 14px 0 6px;
     word-break: break-all;
@@ -359,9 +390,7 @@ function buildWebviewHtml(
     padding: 4px 6px;
     border-radius: 6px;
     color: inherit;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-break: break-all;
   }
   .toc .toc-item-row .toc-link:hover {
     background: rgba(127,127,127,0.15);
@@ -400,6 +429,8 @@ function buildWebviewHtml(
   .content {
     overflow: auto;
     padding: 0 22px 40px;
+    font-size: var(--preview-font-size);
+    line-height: var(--preview-line-height);
   }
     .file-section {
     border: 1px solid var(--border);
@@ -443,13 +474,13 @@ function buildWebviewHtml(
 	grid-column: 1;
 	grid-row: 1;
     font-weight: 700;
-    font-size: 1rem;
+    font-size: 1em;
     word-break: break-all;
     }
     .file-path {
 	grid-column: 1 / 3;
 	grid-row: 2;
-    font-size: 0.8rem;
+    font-size: 0.8em;
     color: var(--muted);
     word-break: break-all;
     margin-top: 4px;
@@ -458,7 +489,7 @@ function buildWebviewHtml(
     padding: 12px 14px;
   }
   /* 最低限のMarkdown表示（必要に応じて拡張） */
-  .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin-top: 1.2em; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4, .markdown-body h5, .markdown-body h6 { margin-top: 1.2em; line-height: 1.3; }
   .markdown-body pre { overflow:auto; padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
   .markdown-body code { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
   .markdown-body table { border-collapse: collapse; }
@@ -580,7 +611,13 @@ async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Pr
 	return buildWebviewHtml(webview, {
 		files,
 		toc,
-		contentHtml: sectionsHtml.join("\n")
+		contentHtml: sectionsHtml.join("\n"),
+		config: {
+			previewFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.fontSize", 100),
+			previewLineHeight: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.lineHeight", 175),
+			tocFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.fontSize", 12),
+			tocMinWidthChars: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.minWidthChars", 20)
+		}
 	});
 }
 

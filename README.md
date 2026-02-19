@@ -46,7 +46,15 @@
 
 ## 拡張設定
 
-現在、ユーザー向け設定（`contributes.configuration`）はありません。
+以下の設定項目で表示をカスタマイズできます。
+`Ctrl+,` で設定画面を開き、`Markdown Concat Viewer` で検索してください。
+
+| 設定ID | デフォルト | 説明 |
+| :--- | :--- | :--- |
+| `preview.fontSize` | `100` | 本文プレビューのフォントサイズ (**エディタフォントサイズに対する%**) |
+| `preview.lineHeight` | `175` | 本文プレビューの行間 (%) |
+| `toc.fontSize` | `12` | TOC（目次）のフォントサイズ (px) |
+| `toc.minWidthChars` | `20` | TOCの最小幅 (文字数換算) |
 
 ## 既知の制約
 
