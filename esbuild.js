@@ -1,4 +1,5 @@
 const esbuild = require("esbuild");
+const { sassPlugin } = require("esbuild-sass-plugin");
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -38,6 +39,8 @@ async function main() {
 		external: ['vscode'],
 		logLevel: 'silent',
 		plugins: [
+			// SCSS ファイルを CSS 文字列としてバンドルする
+			sassPlugin({ type: 'css-text' }),
 			/* add to the end of plugins array */
 			esbuildProblemMatcherPlugin,
 		],
