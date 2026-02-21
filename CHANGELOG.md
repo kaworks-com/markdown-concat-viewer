@@ -6,6 +6,16 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-02-20
+## [0.5.0] - 2026-02-20
+
+### Added
+- TOC の表示モード切替機能を追加 (通常表示、最小化、オーバーレイ表示)
+- TOCと本文の文字サイズ、行間、本文回り込み最大文字数、TOCの表示幅に関する設定値受け入れを追加
+
+### Changed
+- (v0.5.1) デフォルト設定値を調整
+
 ## [0.4.0] - 2026-02-17
 
 ### Added
