@@ -11,47 +11,47 @@ import webviewCss from './styles/webview.scss';
  * Webview HTML 生成に必要な設定値
  */
 type WebviewConfig = {
-    previewFontSize: number;
-    previewLineHeight: number;
-    previewMaxWidth: number;
-    tocFontSize: number;
-    tocMinWidthChars: number;
+  previewFontSize: number;
+  previewLineHeight: number;
+  previewMaxWidth: number;
+  tocFontSize: number;
+  tocMinWidthChars: number;
 };
 
 /**
  * Webview のメイン HTML を生成する
  */
 export function buildWebviewHtml(
-    webview: vscode.Webview,
-    payload: {
-        files: TocFile[];
-        toc: TocItem[];
-        contentHtml: string;
-        config: WebviewConfig;
-    }
+  webview: vscode.Webview,
+  payload: {
+    files: TocFile[];
+    toc: TocItem[];
+    contentHtml: string;
+    config: WebviewConfig;
+  }
 ): string {
-    const nonce = getNonce();
+  const nonce = getNonce();
 
-    // TOCはHTMLを自前生成（安全のため text は escape）
-    const tocHtml = buildTocHtml(payload.files, payload.toc);
+  // TOCはHTMLを自前生成（安全のため text は escape）
+  const tocHtml = buildTocHtml(payload.files, payload.toc);
 
-    // 最低限のCSP。styleは埋め込み、scriptはnonceで許可。
-    const csp = [
-        `default-src 'none'`,
-        `img-src ${webview.cspSource} https: data:`,
-        `style-src ${webview.cspSource} 'unsafe-inline'`,
-        `script-src 'nonce-${nonce}'`
-    ].join("; ");
+  // 最低限のCSP。styleは埋め込み、scriptはnonceで許可。
+  const csp = [
+    `default-src 'none'`,
+    `img-src ${webview.cspSource} https: data:`,
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
+    `script-src 'nonce-${nonce}'`
+  ].join("; ");
 
-    // TOC幅の計算: 文字サイズ * 文字数 + パディング等の概算
-    const tocWidth = (payload.config.tocFontSize * payload.config.tocMinWidthChars) + 24;
+  // TOC幅の計算: 文字サイズ * 文字数 + パディング等の概算
+  const tocWidth = (payload.config.tocFontSize * payload.config.tocMinWidthChars) + 24;
 
-    // エディタのフォントサイズを取得（デフォルト14px）
-    const editorFontSize = vscode.workspace.getConfiguration("editor").get<number>("fontSize", 14);
-    // 設定値は％なので、エディタフォントサイズに対する割合で計算
-    const previewFontSizePx = editorFontSize * (payload.config.previewFontSize / 100);
+  // エディタのフォントサイズを取得（デフォルト14px）
+  const editorFontSize = vscode.workspace.getConfiguration("editor").get<number>("fontSize", 14);
+  // 設定値は％なので、エディタフォントサイズに対する割合で計算
+  const previewFontSizePx = editorFontSize * (payload.config.previewFontSize / 100);
 
-    return `<!doctype html>
+  return `<!doctype html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
@@ -162,6 +162,14 @@ export function buildWebviewHtml(
     updateTocMode();
   });
 
+  // 更新ボタン: クリックで Markdown を再読み込みする
+  const refreshBtn = document.getElementById('toc-refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      vscodeApi.postMessage({ type: 'refreshMarkdown' });
+    });
+  }
+
   document.querySelectorAll('.toc .toc-edit-button[data-file-uri-key][data-line]').forEach(button => {
     button.addEventListener('click', (e) => {
       e.preventDefault();
@@ -225,63 +233,67 @@ export function buildWebviewHtml(
  * TOC の HTML を生成する（ファイルグループ + 見出しリンク）
  */
 export function buildTocHtml(files: TocFile[], items: TocItem[]): string {
-    const fileMap = new Map<number, TocFile>();
-    for (const file of files) {
-        fileMap.set(file.fileIndex, file);
-    }
+  const fileMap = new Map<number, TocFile>();
+  for (const file of files) {
+    fileMap.set(file.fileIndex, file);
+  }
 
-    const byFile = new Map<number, TocItem[]>();
-    for (const it of items) {
-        const arr = byFile.get(it.fileIndex) ?? [];
-        arr.push(it);
-        byFile.set(it.fileIndex, arr);
-    }
+  const byFile = new Map<number, TocItem[]>();
+  for (const it of items) {
+    const arr = byFile.get(it.fileIndex) ?? [];
+    arr.push(it);
+    byFile.set(it.fileIndex, arr);
+  }
 
-    let html = "";
-    for (const file of files) {
-        const arr = byFile.get(file.fileIndex) ?? [];
-        const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
-        html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
-        for (const it of arr) {
-            html += `<div class="toc-item-row lvl-${it.level}">
+  let html = "";
+  for (const file of files) {
+    const arr = byFile.get(file.fileIndex) ?? [];
+    const fileName = fileMap.get(file.fileIndex)?.fileName ?? `file-${file.fileIndex}`;
+    html += `<div class="group-row"><div class="group-title">${escapeHtml(fileName)}</div></div>`;
+    for (const it of arr) {
+      html += `<div class="toc-item-row lvl-${it.level}">
   <a href="#" class="toc-link" data-anchor="${escapeHtml(it.anchorId)}" title="${escapeHtml(fileName + " - " + it.text)}">${escapeHtml(it.text || "(no title)")}</a>
   <button class="toc-edit-button" type="button" title="この見出しを編集で開く" aria-label="この見出しを編集で開く" data-file-uri-key="${escapeHtml(it.fileUriKey)}" data-line="${it.sourceLine}">✎</button>
 </div>`;
-        }
     }
-    return html;
+  }
+  // TOC最下部に再読み込みボタンを追加
+  html += `<div class="toc-refresh-row">
+  <button id="toc-refresh-btn" class="toc-refresh-btn" type="button" title="Markdownを再読み込みする" aria-label="Markdownを再読み込みする">↺ 再読み込み</button>
+</div>`;
+  return html;
 }
 
 /**
  * Webview パネル用の HTML を構築する（ファイル読み込み + レンダリング + HTML 生成）
  */
 export async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri[]): Promise<string> {
-    const md = createMarkdownIt();
-    const toc: TocItem[] = [];
-    const files: TocFile[] = [];
-    const sectionsHtml: string[] = [];
+  const md = createMarkdownIt();
+  const toc: TocItem[] = [];
+  const files: TocFile[] = [];
+  const sectionsHtml: string[] = [];
 
-    for (let i = 0; i < mdUris.length; i++) {
-        const u = mdUris[i];
-        const buf = await vscode.workspace.fs.readFile(u);
-        const text = new TextDecoder().decode(buf);
-        const displayPath = toProjectRelativePath(u);
-        const fileName = path.basename(u.fsPath);
+  for (let i = 0; i < mdUris.length; i++) {
+    const u = mdUris[i];
+    const buf = await vscode.workspace.fs.readFile(u);
+    const text = new TextDecoder().decode(buf);
+    const displayPath = toProjectRelativePath(u);
+    const fileName = path.basename(u.fsPath);
 
-        const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
-            fileIndex: i,
-            fileName,
-            fileUriKey: toUriKey(u)
-        });
+    const { html, tocItemsForFile } = renderMarkdownWithAnchors(md, text, {
+      fileIndex: i,
+      fileName,
+      fileUriKey: toUriKey(u)
+    });
 
-        toc.push(...tocItemsForFile);
-        files.push({
-            fileIndex: i,
-            fileName,
-            fileUriKey: toUriKey(u)
-        });
+    toc.push(...tocItemsForFile);
+    files.push({
+      fileIndex: i,
+      fileName,
+      fileUriKey: toUriKey(u)
+    });
 
-        sectionsHtml.push(`
+    sectionsHtml.push(`
   <details class="file-section" data-file-index="${i}" open>
     <summary class="file-summary">
       <div class="file-title">${escapeHtml(fileName)}</div>
@@ -292,18 +304,18 @@ export async function buildPanelHtml(webview: vscode.Webview, mdUris: vscode.Uri
     </div>
   </details>
 `);
-    }
+  }
 
-    return buildWebviewHtml(webview, {
-        files,
-        toc,
-        contentHtml: sectionsHtml.join("\n"),
-        config: {
-            previewFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.fontSize", 100),
-            previewLineHeight: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.lineHeight", 175),
-            previewMaxWidth: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.maxWidth", 40),
-            tocFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.fontSize", 12),
-            tocMinWidthChars: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.minWidthChars", 20)
-        }
-    });
+  return buildWebviewHtml(webview, {
+    files,
+    toc,
+    contentHtml: sectionsHtml.join("\n"),
+    config: {
+      previewFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.fontSize", 100),
+      previewLineHeight: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.lineHeight", 175),
+      previewMaxWidth: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("preview.maxWidth", 40),
+      tocFontSize: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.fontSize", 12),
+      tocMinWidthChars: vscode.workspace.getConfiguration("markdownConcatViewer").get<number>("toc.minWidthChars", 20)
+    }
+  });
 }

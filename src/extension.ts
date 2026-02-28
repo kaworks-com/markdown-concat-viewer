@@ -82,7 +82,15 @@ export function activate(context: vscode.ExtensionContext) {
         };
 
         panel.webview.onDidReceiveMessage(async (message) => {
-          if (!message || message.type !== "openMarkdownForEditAtLine" || typeof message.fileUriKey !== "string") {
+          if (!message) {
+            return;
+          }
+          // Markdown を再読み込みする
+          if (message.type === "refreshMarkdown") {
+            await renderView();
+            return;
+          }
+          if (message.type !== "openMarkdownForEditAtLine" || typeof message.fileUriKey !== "string") {
             return;
           }
           const targetUri = markdownUriMap.get(message.fileUriKey);

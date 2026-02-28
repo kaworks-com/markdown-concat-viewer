@@ -3,6 +3,8 @@
 関連資料:
 - 画面パーツ用語集: `docs/reference/glossary-ui-parts.md`
 - 設定仕様書: `docs/reference/configuration.md`
+- 開発環境ガイド: `docs/dev/development.md`
+- ビルドシステム: `docs/dev/build.md`
 
 ## 目的
 VS Code拡張として、ファイルエクスプローラーで選択したMarkdownファイル、または選択ディレクトリ直下のMarkdownファイルを1つのビューで連結表示し、ファイル単位の折りたたみと目次（TOC）で素早く閲覧できるようにする。

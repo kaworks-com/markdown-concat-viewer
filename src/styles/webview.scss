@@ -48,7 +48,7 @@ body {
   height: 100vh;
   border-left: 1px solid var(--border);
   overflow: auto;
-  padding: 12px 10px;
+  padding: 12px 10px 28px; // VS Code ステータスバー分の下余白
   font-size: var(--toc-font-size);
   background-color: var(--toc-bg);
   transition: padding 0.2s, box-shadow 0.2s, transform 0.2s;
@@ -133,6 +133,8 @@ body {
       border-radius: 6px;
       color: inherit;
       word-break: break-all;
+      min-width: 0; // グリッドセル内でテキストを折り返すために必要
+      max-width: calc(var(--toc-width) - 40px);
 
       &:hover {
         background: rgba(127, 127, 127, 0.15);
@@ -167,13 +169,79 @@ body {
   }
 
   // インデントレベル
-  .toc-item-row.lvl-1 { padding-left: 6px; }
-  .toc-item-row.lvl-2 { padding-left: 18px; }
-  .toc-item-row.lvl-3 { padding-left: 30px; }
-  .toc-item-row.lvl-4 { padding-left: 42px; }
-  .toc-item-row.lvl-5 { padding-left: 54px; }
-  .toc-item-row.lvl-6 { padding-left: 66px; }
-  .toc-item-row.lvl-1 .toc-link { font-weight: 600; }
+  .toc-item-row.lvl-1 {
+    padding-left: 6px;
+  }
+
+  .toc-item-row.lvl-2 {
+    padding-left: 18px;
+  }
+
+  .toc-item-row.lvl-3 {
+    padding-left: 30px;
+  }
+
+  .toc-item-row.lvl-4 {
+    padding-left: 42px;
+  }
+
+  .toc-item-row.lvl-5 {
+    padding-left: 54px;
+  }
+
+  .toc-item-row.lvl-6 {
+    padding-left: 66px;
+  }
+
+  .toc-item-row.lvl-1 .toc-link {
+    font-weight: 600;
+  }
+}
+
+// ─────────────────────────────────────────
+// TOC 更新ボタン
+// ─────────────────────────────────────────
+.toc-refresh-row {
+  margin-top: 16px;
+  padding: 8px 6px 28px; // VS Code ステータスバー分の下余白
+  border-top: 1px solid var(--border);
+}
+
+.toc-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  font-size: var(--toc-font-size);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+
+  &:hover {
+    opacity: 1;
+    background: var(--vscode-button-secondaryHoverBackground);
+  }
+
+  // 最小化モード: アイコン（↺）のみ表示
+  .layout[data-toc-mode="minimized"] & {
+    font-size: 0;
+    padding: 4px;
+    gap: 0;
+
+    &::before {
+      content: "↺";
+      font-size: 14px;
+      display: block;
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -314,7 +382,7 @@ body {
   }
 }
 
-details:not([open]) > .file-summary::after {
+details:not([open])>.file-summary::after {
   content: "◀";
 }
 
@@ -347,7 +415,13 @@ details:not([open]) > .file-summary::after {
 // Markdown 本文スタイル
 // ─────────────────────────────────────────
 .markdown-body {
-  h1, h2, h3, h4, h5, h6 {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     margin-top: 1.2em;
     line-height: 1.3;
   }
@@ -365,9 +439,16 @@ details:not([open]) > .file-summary::after {
 
   table {
     border-collapse: collapse;
+    // .file-body の左右 padding（2rem / 1rem）を相殺してコンテンツ全幅で描画
+    width: calc(100% + 2rem + 1rem);
+    margin-left: -2rem;
+    margin-right: -1rem;
+    display: block;
+    overflow-x: auto; // 列が多い場合は横スクロール
   }
 
-  th, td {
+  th,
+  td {
     border: 1px solid var(--border);
     padding: 6px 8px;
   }

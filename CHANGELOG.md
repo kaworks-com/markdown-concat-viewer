@@ -6,6 +6,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-02-28
+
+### Added
+- TOC 最下部に手動で Markdown を再読み込みする「↺ 再読み込み」ボタンを追加
+  - クリックすると対象 Markdown を再読み込みし、プレビューを最新化する
+  - TOC 最小化モード時はアイコン（↺）のみ表示
+
 ## [0.5.1] - 2026-02-20
 ## [0.5.0] - 2026-02-20
 
